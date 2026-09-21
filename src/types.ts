@@ -358,6 +358,17 @@ export const TeamaiConfigSchema = z.object({
       mcp: '.qoder/settings.json',
       mcpProject: '.qoder/settings.json',
     },
+    // Qoder CN is a separate distribution with its own user directory
+    // (~/.qoder-cn), so it needs its own entry rather than sharing `qoder`.
+    // It reads the same Claude-compatible resource formats.
+    'qoder-cn': {
+      skills: '.qoder-cn/skills',
+      rules: '.qoder-cn/rules',
+      settings: '.qoder-cn/settings.json',
+      agents: '.qoder-cn/agents',
+      mcp: '.qoder-cn/settings.json',
+      mcpProject: '.qoder-cn/settings.json',
+    },
     // Kiro: skills, steering (rules), and custom agents sync to .kiro/. Kiro CLI
     // 2.x stores lifecycle hooks inside each .kiro/agents/*.json config. The
     // Kiro agent renderer therefore embeds TeamAI's session-start dispatch as
