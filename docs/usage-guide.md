@@ -794,7 +794,7 @@ Where each tool's servers land:
 | copilot | `$COPILOT_HOME/mcp-config.json` | `<project>/.github/mcp.json` |
 | codex | `~/.codex/config.toml` | not supported |
 | qoder | `~/.qoder/settings.json` | `<project>/.qoder/settings.json` |
-| qoder-cn | `~/.qoder-cn/settings.json` | `<project>/.qoder-cn/settings.json` |
+| qoder-cn | `~/.qoder-cn/settings.json` | `<project>/.qoder/settings.json` |
 | kiro | `~/.kiro/settings/mcp.json` | `<project>/.kiro/settings/mcp.json` |
 | opencode | `~/.config/opencode/opencode.json` | `<project>/opencode.json` |
 | omp | `~/.omp/agent/mcp.json` | `<project>/.omp/mcp.json` |

@@ -1439,6 +1439,15 @@ export async function reconcileHooksToAllTools(
     : skipToolsWithoutShell(
         Object.keys(toolPaths).filter(t => !opts.filterAgents || opts.filterAgents.includes(t)),
       );
+  // One settings file is one install. Two targets can resolve to the same file —
+  // Qoder CN's project scope IS Qoder's `<root>/.qoder/settings.json` — and this
+  // pass is per tool, so a second pass over the file re-renders every built-in
+  // entry with the *other* tool's dispatch identity (`teamai hook-dispatch …
+  // --tool <tool>`) and drops the team hooks scoped to the first one. Reconcile
+  // each file once, for the first target that reaches it: the shipped table
+  // lists `qoder` before `qoder-cn`, so the existing target keeps ownership of
+  // the project file and the CN target stays a user-scope addition there.
+  const claimedSettingsFiles = new Set<string>();
   for (const [tool, paths] of Object.entries(toolPaths)) {
     if (opts.filterAgents && !opts.filterAgents.includes(tool)) continue;
     if (skipped.has(tool)) continue;
@@ -1497,6 +1506,9 @@ export async function reconcileHooksToAllTools(
       : toolRoot;
     if (!await pathExists(toolRoot) && !await pathExists(installedRoot)) continue;
     const settingsPath = path.join(baseDir, paths.settings);
+    const settingsFileKey = path.resolve(settingsPath);
+    if (claimedSettingsFiles.has(settingsFileKey)) continue;
+    claimedSettingsFiles.add(settingsFileKey);
     try {
       await reconcileHooks(settingsPath, tool, teamDefs, {
         manifestPath,

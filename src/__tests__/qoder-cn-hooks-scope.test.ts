@@ -111,4 +111,33 @@ describe('Qoder CN hooks route by scope', () => {
     expect(await fse.pathExists(cnProjectUserDirSettings())).toBe(false);
     expect(await fse.pathExists(cnUserSettings())).toBe(false);
   });
+
+  // Qoder and Qoder CN share ONE project-scope hook file, so with both targets
+  // enabled (the default: no --agent whitelist) the file must be reconciled once
+  // — for Qoder, the target that owns `<root>/.qoder/` — instead of the later
+  // `qoder-cn` pass re-rendering every built-in with `--tool qoder-cn` and
+  // dropping Qoder's tool-scoped team hooks. The single-target pass above still
+  // targets the file as `qoder-cn`, because nothing else claims it there.
+  it('project scope: a file shared with Qoder is reconciled once, as Qoder', async () => {
+    await fse.ensureDir(path.join(project, '.qoder'));
+    await fse.ensureDir(path.join(repo, 'hooks'));
+    await fse.writeFile(path.join(repo, 'hooks', 'hooks.yaml'), `
+hooks:
+  - id: qoder-only
+    description: qoder only hook
+    event: Stop
+    matcher: "*"
+    command: echo QODER_ONLY_PAYLOAD
+    tools: [qoder]
+`);
+
+    // No filterAgents: every configured target, exactly what pull/init do.
+    await reconcileTeamHooksForConfig(teamConfig(), selfLocalConfig());
+
+    const commands = commandStrings(await fse.readJson(cnProjectSettings()));
+    expect(commands.some((command) => /--tool qoder(?![-\w])/.test(command))).toBe(true);
+    expect(commands.some((command) => command.includes('--tool qoder-cn'))).toBe(false);
+    // The tool-scoped team hook survives, because its owning target wrote the file.
+    expect(commands.some((command) => command.includes('QODER_ONLY_PAYLOAD'))).toBe(true);
+  });
 });

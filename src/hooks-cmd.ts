@@ -87,15 +87,30 @@ export async function hooksInject(options: GlobalOptions): Promise<void> {
  */
 export async function hooksList(_options: GlobalOptions): Promise<void> {
     const { localConfig, teamConfig } = await autoDetectInit();
-    const { baseDir } = resolveHookScope(localConfig);
+    const { baseDir, scope: hookScope } = resolveHookScope(localConfig);
+    // The settings file must be resolved at the scope hooks were injected into,
+    // not at the config's scope: a non-self project scope injects into HOME, and a
+    // tool whose user-scope prefix differs from its project-scope one (Qoder CN:
+    // `~/.qoder-cn` vs `<root>/.qoder`) would otherwise be probed in the *other*
+    // build's file and always reported missing.
+    const hookScopedPaths = scopedToolPaths(teamConfig, { ...localConfig, scope: hookScope });
     const rows: HookListRow[] = [];
+    // One settings file is one install, so list it once, for the target that owns
+    // it — the same rule reconcileHooksToAllTools applies when writing. Qoder CN
+    // shares Qoder's project file, and probing it as its own identity there would
+    // report a healthy install as `missing`.
+    const seenSettingsFiles = new Set<string>();
 
     for (const [tool, paths] of Object.entries(scopedToolPaths(teamConfig, localConfig))) {
         const hookPath = paths.hooks
             ? path.join(resolveToolBaseDir(tool, localConfig), paths.hooks)
-            : paths.settings
-                ? path.join(baseDir, paths.settings)
+            : hookScopedPaths[tool]?.settings
+                ? path.join(baseDir, hookScopedPaths[tool].settings)
                 : undefined;
+        if (hookPath) {
+            if (seenSettingsFiles.has(hookPath)) continue;
+            seenSettingsFiles.add(hookPath);
+        }
         // OMP has no settings/hooks file to parse: its hooks are a single
         // generated extension under the user agent dir, so presence of the
         // file (with our marker) is the whole status.
