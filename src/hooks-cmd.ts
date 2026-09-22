@@ -8,6 +8,7 @@ import type { GlobalOptions } from './types.js';
 import {
     COPILOT_TOOL_ID,
     getManagedHooksPath,
+    isAgentExcluded,
     resolveHookScope,
     resolveToolBaseDir,
     scopedToolPaths,
@@ -96,12 +97,21 @@ export async function hooksList(_options: GlobalOptions): Promise<void> {
     const hookScopedPaths = scopedToolPaths(teamConfig, { ...localConfig, scope: hookScope });
     const rows: HookListRow[] = [];
     // One settings file is one install, so list it once, for the target that owns
-    // it — the same rule reconcileHooksToAllTools applies when writing. Qoder CN
-    // shares Qoder's project file, and probing it as its own identity there would
-    // report a healthy install as `missing`.
+    // it — the same rule the write path applies. Qoder CN shares Qoder's project
+    // file, and probing it as its own identity there would report a healthy
+    // install as `missing`.
+    //
+    // Ownership follows the enabled set, not the shipped table: the write path
+    // only ever renders the file for an enabled target, so a target the user
+    // disabled must not claim it here either. Otherwise a self-scope install that
+    // enabled Qoder CN alone would have `qoder` (off, but earlier in the table)
+    // claim `<root>/.qoder/settings.json`, probe it for Qoder's dispatch identity,
+    // and report `missing` while the enabled `qoder-cn` was never listed at all.
+    // `isAgentExcluded` is the same filter `doctor` applies to this path table.
     const seenSettingsFiles = new Set<string>();
 
     for (const [tool, paths] of Object.entries(scopedToolPaths(teamConfig, localConfig))) {
+        if (isAgentExcluded(localConfig, tool)) continue;
         const hookPath = paths.hooks
             ? path.join(resolveToolBaseDir(tool, localConfig), paths.hooks)
             : hookScopedPaths[tool]?.settings

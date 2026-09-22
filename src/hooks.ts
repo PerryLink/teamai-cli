@@ -1444,9 +1444,19 @@ export async function reconcileHooksToAllTools(
   // pass is per tool, so a second pass over the file re-renders every built-in
   // entry with the *other* tool's dispatch identity (`teamai hook-dispatch …
   // --tool <tool>`) and drops the team hooks scoped to the first one. Reconcile
-  // each file once, for the first target that reaches it: the shipped table
-  // lists `qoder` before `qoder-cn`, so the existing target keeps ownership of
-  // the project file and the CN target stays a user-scope addition there.
+  // each file once, for the first target that reaches it.
+  //
+  // The owner is the first *enabled* target, not the first in the shipped table:
+  // `filterAgents` is applied above, so a tool the user excluded is skipped before
+  // it can claim a file, and an install that enabled Qoder CN without Qoder gets
+  // `--tool qoder-cn` built-ins plus its `tools: [qoder-cn]` team hooks in the
+  // shared project file instead of Qoder's identity (and Qoder's team hooks).
+  //
+  // With both editions enabled (the default: no whitelist) `qoder` comes first in
+  // the table and keeps ownership, so a `tools: [qoder-cn]` team hook has no file
+  // to land in and is dropped silently by the per-tool filter in reconcileHooks.
+  // One physical file can carry only one dispatch identity; this is the documented
+  // limit of sharing a project scope, not a bug this pass can fix.
   const claimedSettingsFiles = new Set<string>();
   for (const [tool, paths] of Object.entries(toolPaths)) {
     if (opts.filterAgents && !opts.filterAgents.includes(tool)) continue;
