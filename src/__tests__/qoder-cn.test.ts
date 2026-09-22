@@ -11,34 +11,60 @@ import {
 } from '../resources/agent-format.js';
 import { detectMcpFormat } from '../resources/mcp-format.js';
 import { ruleFileExtensionForTool, usesCursorMdcRules } from '../resources/rule-format.js';
-import { TeamaiConfigSchema } from '../types.js';
+import { TeamaiConfigSchema, scopedToolPaths } from '../types.js';
 import type { LocalConfig } from '../types.js';
 
 describe('Qoder CN support', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it('ships Qoder CN resource paths for user and project scopes', () => {
+  it('ships Qoder CN project-scope paths identical to Qoder, with user-scope overrides', () => {
     const config = TeamaiConfigSchema.parse({ team: 'test', repo: 'test/repo' });
 
+    // Top-level fields are PROJECT-scope paths. Only the user scope differs for
+    // Qoder CN, so these stay identical to the international `qoder` entry.
     expect(config.toolPaths['qoder-cn']).toEqual({
-      skills: '.qoder-cn/skills',
-      rules: '.qoder-cn/rules',
-      settings: '.qoder-cn/settings.json',
-      agents: '.qoder-cn/agents',
+      skills: '.qoder/skills',
+      rules: '.qoder/rules',
+      settings: '.qoder/settings.json',
+      agents: '.qoder/agents',
       mcp: '.qoder-cn/settings.json',
-      mcpProject: '.qoder-cn/settings.json',
+      mcpProject: '.qoder/settings.json',
+      userScope: {
+        skills: '.qoder-cn/skills',
+        rules: '.qoder-cn/rules',
+        settings: '.qoder-cn/settings.json',
+        agents: '.qoder-cn/agents',
+      },
     });
   });
 
-  it('keeps the Qoder CN paths distinct from the international Qoder paths', () => {
+  it('maps Qoder CN to .qoder-cn under user scope and to .qoder under project scope', () => {
     const config = TeamaiConfigSchema.parse({ team: 'test', repo: 'test/repo' });
-    const cn = config.toolPaths['qoder-cn'] as Record<string, string>;
-    const international = config.toolPaths.qoder as Record<string, string>;
 
-    // Qoder CN reads ~/.qoder-cn, so no path may be shared with ~/.qoder.
-    for (const [key, value] of Object.entries(cn)) {
-      expect(value).not.toEqual(international[key]);
-      expect(value.startsWith('.qoder-cn/')).toBe(true);
+    // End-to-end through the scope contract rather than reading the static table:
+    // a CN install reads ~/.qoder-cn, so every user-scope resource must resolve
+    // there and must differ from the international ~/.qoder paths.
+    const userScoped = scopedToolPaths(config, { scope: 'user' });
+    const cnUser = userScoped['qoder-cn'] as Record<string, string>;
+    const qoderUser = userScoped.qoder as Record<string, string>;
+
+    for (const key of ['skills', 'rules', 'settings', 'agents'] as const) {
+      expect(cnUser[key]).toBe(`.qoder-cn/${key === 'settings' ? 'settings.json' : key}`);
+      expect(cnUser[key]).not.toEqual(qoderUser[key]);
+    }
+    // MCP is not part of the userScope splice: its two scopes are distinct
+    // fields and the user-scope file is already the CN one.
+    expect(cnUser.mcp).toBe('.qoder-cn/settings.json');
+    expect(qoderUser.mcp).toBe('.qoder/settings.json');
+
+    // Project scope is the identity map: Qoder CN and Qoder share one layout.
+    const projectScoped = scopedToolPaths(config, { scope: 'project' });
+    const cnProject = projectScoped['qoder-cn'] as Record<string, string>;
+    const qoderProject = projectScoped.qoder as Record<string, string>;
+
+    for (const key of ['skills', 'rules', 'settings', 'agents', 'mcpProject'] as const) {
+      expect(cnProject[key]).toBe(qoderProject[key]);
+      expect(cnProject[key].startsWith('.qoder/')).toBe(true);
     }
   });
 

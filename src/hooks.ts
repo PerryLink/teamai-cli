@@ -1589,7 +1589,7 @@ export async function reconcileTeamHooksForConfig(
         silent: opts.silent,
         activeRoles: activeRoleIds(localConfig),
       });
-  const { baseDir, manifestPath } = resolveHookScope(localConfig);
+  const { baseDir, manifestPath, scope: hookScope } = resolveHookScope(localConfig);
   const explicitlySelectedAgents = opts.filterAgents ?? localConfig.enabledAgents;
   let filterAgents = explicitlySelectedAgents;
   const disabled = localConfig.disabledAgents;
@@ -1599,7 +1599,10 @@ export async function reconcileTeamHooksForConfig(
     const universe = filterAgents ?? Object.keys(teamConfig.toolPaths);
     filterAgents = universe.filter((t) => !disabled.includes(t));
   }
-  await reconcileHooksToAllTools(teamConfig.toolPaths, baseDir, teamDefs, manifestPath, {
+  // Resolve the tool paths at the scope hooks actually live in, not at the
+  // config's scope: a non-self project scope puts hooks in HOME, so its paths
+  // must be the user-scope ones.
+  await reconcileHooksToAllTools(scopedToolPaths(teamConfig, { ...localConfig, scope: hookScope }), baseDir, teamDefs, manifestPath, {
     removeAll: opts.removeAll,
     builtinOverride: builtin,
     filterAgents,

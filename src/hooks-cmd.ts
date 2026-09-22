@@ -153,8 +153,11 @@ export async function hooksList(_options: GlobalOptions): Promise<void> {
 export async function hooksRemove(_options: GlobalOptions): Promise<void> {
     const { localConfig, teamConfig } = await autoDetectInit();
 
-    const { baseDir, manifestPath } = resolveHookScope(localConfig);
-    await reconcileHooksToAllTools(teamConfig.toolPaths, baseDir, [], manifestPath, { removeAll: true });
+    const { baseDir, manifestPath, scope: hookScope } = resolveHookScope(localConfig);
+    // Removal must target the same paths injection used. A non-self project
+    // scope injects into HOME, so resolving the project-scope paths here would
+    // miss (and leave behind) every tool whose user-scope prefix differs.
+    await reconcileHooksToAllTools(scopedToolPaths(teamConfig, { ...localConfig, scope: hookScope }), baseDir, [], manifestPath, { removeAll: true });
 
     const copilotPaths = scopedToolPaths(teamConfig, localConfig)[COPILOT_TOOL_ID];
     if (copilotPaths?.hooks) {
